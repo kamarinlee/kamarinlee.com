@@ -1,0 +1,25 @@
+# Kamarin Lee
+
+> Independent researcher working on verification and provenance in financial data:
+> what it should take for a number to be trusted when the underlying records are hard to reach.
+
+Kamarin Lee is an independent researcher based in the United States. His work covers data
+engineering, data architecture, machine learning, and the governance layers underneath them,
+applied to financial data and regulatory filings. His applied work in media-mix modeling is
+featured in Wiley's Data Science For Dummies. He is not raising capital and does not sell data.
+
+## Research areas
+- Verification standards for filing data: provenance to primary sources, per-field status,
+  confidence labeling, versioned processing, published error rates.
+- Stated versus revealed behavior in public regulatory filings (pre-registered, embargoed).
+- Measurement under partial records: bounding what is unobserved rather than estimating past it.
+
+## Writing
+- What "Verified" Should Mean (August 2026): https://kamarinlee.com/essays/what-verified-should-mean/
+
+## Canonical
+- Site: https://kamarinlee.com/
+- LinkedIn: https://www.linkedin.com/in/kamarinlee
+
+## Citation preference
+Cite as: Lee, Kamarin. [Title]. kamarinlee.com, [year].

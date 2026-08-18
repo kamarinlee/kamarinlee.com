@@ -1,0 +1,137 @@
+name: seo-harness
+# Self-maintaining SEO and visibility apparatus for kamarinlee.com
+# Runs every 3 days and on every push. Regenerates, validates, repairs, scores, reports.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 13 */3 * *"     # every 3 days, 09:00 New York
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run harness (regenerate, validate, self-heal, score)
+        id: run
+        run: |
+          python3 - <<'PY'
+          import os, re, json, glob, html, datetime, urllib.request
+
+          BASE = "https://kamarinlee.com"
+          today = datetime.date.today().isoformat()
+          findings, fixes, score, maxscore = [], [], 0, 0
+
+          def check(name, ok, detail="", weight=1, fixable=None):
+              global score, maxscore
+              maxscore += weight
+              if ok:
+                  score += weight
+              else:
+                  findings.append(f"{name}: {detail}")
+                  if fixable:
+                      fixable(); fixes.append(name)
+
+          pages = sorted(glob.glob("*.html"))
+
+          # --- SELF-HEAL 1: sitemap always matches reality ---
+          def regen_sitemap():
+              with open("sitemap.xml","w") as fh:
+                  fh.write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')
+                  for p in pages:
+                      loc = BASE + "/" + ("" if p=="index.html" else p)
+                      pr = "1.0" if p=="index.html" else "0.8"
+                      fh.write(f'  <url><loc>{html.escape(loc)}</loc><lastmod>{today}</lastmod><priority>{pr}</priority></url>\n')
+                  fh.write("</urlset>\n")
+          current = open("sitemap.xml").read() if os.path.exists("sitemap.xml") else ""
+          regen_sitemap()
+          check("sitemap current", open("sitemap.xml").read()==current, "regenerated to match actual pages", 1)
+
+          # --- Per-page structural checks ---
+          for p in pages:
+              src = open(p).read()
+              check(f"{p} title", "<title>" in src, "missing <title>")
+              check(f"{p} description", 'name="description"' in src, "missing meta description", 2)
+              check(f"{p} canonical", 'rel="canonical"' in src, "missing canonical tag", 2)
+              check(f"{p} og tags", 'og:title' in src and 'og:description' in src, "missing Open Graph tags")
+              blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', src, re.S)
+              ok = bool(blocks)
+              for b in blocks:
+                  try: json.loads(b)
+                  except Exception as e: ok = False; findings.append(f"{p} JSON-LD parse error: {e}")
+              check(f"{p} structured data", ok, "JSON-LD missing or invalid", 3)
+              check(f"{p} h1", src.count("<h1")>=1, "no h1")
+              check(f"{p} orcid linked", "orcid.org" in src, "ORCID not linked (identity anchor)", 2)
+
+          # --- AI crawler permissions ---
+          robots = open("robots.txt").read() if os.path.exists("robots.txt") else ""
+          for bot in ["GPTBot","ClaudeBot","PerplexityBot","Google-Extended","OAI-SearchBot","Applebot-Extended","CCBot","Bingbot"]:
+              check(f"crawler {bot}", bot in robots, "not present in robots.txt", 1)
+          check("llms.txt present", os.path.exists("llms.txt"), "missing AI-readable summary", 3)
+
+          # --- Link rot ---
+          dead, seen = [], set()
+          for p in pages:
+              for u in re.findall(r'href="(https?://[^"]+)"', open(p).read()):
+                  if u in seen: continue
+                  seen.add(u)
+                  try:
+                      urllib.request.urlopen(urllib.request.Request(u, method="HEAD",
+                          headers={"User-Agent":"kamarinlee-harness"}), timeout=15)
+                  except Exception as e:
+                      dead.append(f"{u} ({str(e)[:40]})")
+          check("no dead links", not dead, "; ".join(dead[:5]), 3)
+
+          pct = round(100*score/maxscore) if maxscore else 0
+          grade = "HEALTHY" if pct>=95 else ("DEGRADED" if pct>=80 else "ACTION NEEDED")
+
+          # --- Recommendation engine: what would move the needle next ---
+          recs = []
+          if dead: recs.append("Repair or remove dead links; broken outbound links reduce crawl trust.")
+          if not os.path.exists("llms.txt"): recs.append("Add llms.txt so assistants cite you accurately.")
+          if len(pages) < 3: recs.append("Publish more indexable pages; each essay is a new entry point and a new ranking surface.")
+          if not any("scholar.google" in open(p).read() for p in pages): recs.append("Add Google Scholar profile link once the first paper is indexed; strongest academic entity signal.")
+          if not any("ssrn.com" in open(p).read() for p in pages): recs.append("Add SSRN author page link when the working paper posts.")
+          if not any("wikidata" in open(p).read().lower() for p in pages): recs.append("Create a Wikidata item once 3+ independent citations exist; this is the direct feed into knowledge panels.")
+          recs.append("Authority comes from other sites citing you. Track new inbound mentions weekly and add each as a sameAs where appropriate.")
+
+          report = {"date": today, "score": pct, "grade": grade,
+                    "checks_passed": f"{score}/{maxscore}", "pages": len(pages),
+                    "links_checked": len(seen), "auto_repaired": fixes,
+                    "findings": findings[:15], "recommendations": recs[:6]}
+          open("seo-report.json","w").write(json.dumps(report, indent=2))
+
+          lines = [f"*SEO harness — kamarinlee.com* · {today}",
+                   f"*Health:* {pct}% ({grade}) · checks {score}/{maxscore} · pages {len(pages)} · links {len(seen)}"]
+          if fixes: lines.append(f"*Self-repaired:* {', '.join(fixes)}")
+          if findings: lines.append("*Findings:*\n" + "\n".join("• "+f for f in findings[:8]))
+          else: lines.append("*Findings:* none")
+          lines.append("*Next moves:*\n" + "\n".join("• "+r for r in recs[:4]))
+          open("slack.txt","w").write("\n".join(lines))
+          print("\n".join(lines))
+          PY
+
+      - name: Commit self-repairs
+        run: |
+          git config user.name "seo-harness"
+          git config user.email "harness@users.noreply.github.com"
+          git add sitemap.xml seo-report.json || true
+          git diff --staged --quiet || git commit -m "harness: self-repair + report ($(date -u +%F))"
+          git push || true
+
+      - name: Report to Slack
+        if: always()
+        run: |
+          TEXT=$(cat slack.txt | python3 -c "import sys,json;print(json.dumps(sys.stdin.read()))")
+          curl -s -X POST -H 'Content-type: application/json' \
+            --data "{\"text\": $TEXT}" "${{ secrets.SLACK_WEBHOOK_URL }}" || true
+
+      - name: Ping search engines
+        run: |
+          curl -s "https://www.bing.com/indexnow?url=https://kamarinlee.com/&key=${{ secrets.INDEXNOW_KEY }}" || true
