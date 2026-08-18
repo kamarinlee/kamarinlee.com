@@ -1,0 +1,26 @@
+{
+  "date": "2026-08-18",
+  "score": 52,
+  "grade": "ACTION NEEDED",
+  "checks_passed": "14/27",
+  "pages": 1,
+  "links_checked": 0,
+  "auto_repaired": [],
+  "findings": [
+    "sitemap current: regenerated to match actual pages",
+    "index.html title: missing <title>",
+    "index.html description: missing meta description",
+    "index.html canonical: missing canonical tag",
+    "index.html og tags: missing Open Graph tags",
+    "index.html structured data: JSON-LD missing or invalid",
+    "index.html h1: no h1",
+    "index.html orcid linked: ORCID not linked (identity anchor)"
+  ],
+  "recommendations": [
+    "Publish more indexable pages; each essay is a new entry point and a new ranking surface.",
+    "Add Google Scholar profile link once the first paper is indexed; strongest academic entity signal.",
+    "Add SSRN author page link when the working paper posts.",
+    "Create a Wikidata item once 3+ independent citations exist; this is the direct feed into knowledge panels.",
+    "Authority comes from other sites citing you. Track new inbound mentions weekly and add each as a sameAs where appropriate."
+  ]
+}
