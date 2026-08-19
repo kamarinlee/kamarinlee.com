@@ -1,13 +1,12 @@
 {
   "date": "2026-08-19",
-  "score": 52,
+  "score": 56,
   "grade": "ACTION NEEDED",
-  "checks_passed": "14/27",
+  "checks_passed": "15/27",
   "pages": 1,
   "links_checked": 0,
   "auto_repaired": [],
   "findings": [
-    "sitemap current: regenerated to match actual pages",
     "index.html title: missing <title>",
     "index.html description: missing meta description",
     "index.html canonical: missing canonical tag",
